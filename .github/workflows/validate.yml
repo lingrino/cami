@@ -1,0 +1,17 @@
+name: Validate
+
+on: push
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    container: lingrino/ci:latest
+    steps:
+      - name: Code - Checkout
+        uses: actions/checkout@master
+        with:
+          fetch-depth: 1
+      - name: Go fmt
+        run: test -z $(gofmt -l -w -s ./)
+      - name: Run Tests
+        run: go test -cover -race -v ./...

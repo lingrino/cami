@@ -1,0 +1,35 @@
+project_name: cami
+env:
+  - CGO_ENABLED=0
+  - GO111MODULE=on
+before:
+  hooks:
+    - go mod download
+archives:
+  - id: cami
+    replacements:
+      darwin: Darwin
+      linux: Linux
+      windows: Windows
+      386: i386
+      amd64: x86_64
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ .Tag }}-next"
+changelog:
+  sort: asc
+brews:
+  - name: cami
+    description: "A CLI and API for cleaning up unused AWS AMIs"
+    homepage: https://lingrino.com/
+    skip_upload: auto
+    github:
+      owner: lingrino
+      name: homebrew-tap
+    commit_author:
+      name: Sean Lingren
+      email: sean@lingrino.com
+    folder: Formula
+    test: |
+      system "#{bin}/cami version"
