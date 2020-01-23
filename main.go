@@ -8,24 +8,17 @@ import (
 )
 
 func main() {
-	aws := cami.NewAWS()
-	aws.Auth()
-
-	amis, err := aws.AMIs()
+	aws, err := cami.NewAWS(&cami.Config{DryRun: true})
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(len(amis))
 
-	ec2s, err := aws.EC2s(amis)
+	err = aws.Auth()
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(len(ec2s))
 
-	amis, err = aws.FilterAMIs(amis, ec2s)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(len(amis))
+	deleted, err := aws.DeleteUnusedAMIs()
+	fmt.Println(err)
+	fmt.Println(deleted)
 }
