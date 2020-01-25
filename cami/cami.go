@@ -1,12 +1,18 @@
 package cami
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 )
+
+var newEC2Fn = ec2.New
+var newSessionFn = session.NewSession
 
 // Config holds the configuration for our AWS struct
 type Config struct {
@@ -18,8 +24,9 @@ type Config struct {
 type AWS struct {
 	cfg *Config
 
-	sess *session.Session
-	ec2  *ec2.EC2
+	ec2 ec2iface.EC2API
+
+	filterErr bool
 }
 
 // NewAWS returns a new AWS struct
@@ -31,13 +38,12 @@ func NewAWS(c *Config) (*AWS, error) {
 func (a *AWS) Auth() error {
 	var err error
 
-	sess, err := session.NewSession()
+	sess, err := newSessionFn()
 	if err != nil {
-		return fmt.Errorf("failed to create session: %w", err)
+		return fmt.Errorf("%w", ErrCreateSession)
 	}
-	a.sess = sess
 
-	ec2 := ec2.New(a.sess)
+	ec2 := newEC2Fn(sess)
 	a.ec2 = ec2
 
 	return err
@@ -53,7 +59,7 @@ func (a *AWS) AMIs() ([]*ec2.Image, error) {
 	}
 	amiO, err := a.ec2.DescribeImages(amiI)
 	if err != nil {
-		return output, fmt.Errorf("failed to describe images: %w", err)
+		return output, fmt.Errorf("%w", ErrDesribeImages)
 	}
 
 	output = amiO.Images
@@ -78,14 +84,13 @@ func (a *AWS) EC2s(amis []*ec2.Image) ([]*ec2.Instance, error) {
 			},
 		},
 	}
-	ec2O, err := a.ec2.DescribeInstances(ec2I)
 
 	pageNum, pageMax := 0, 20
 	err = a.ec2.DescribeInstancesPages(ec2I,
 		func(page *ec2.DescribeInstancesOutput, lastPage bool) bool {
 			pageNum++
 
-			for _, res := range ec2O.Reservations {
+			for _, res := range page.Reservations {
 				output = append(output, res.Instances...)
 			}
 
@@ -94,7 +99,7 @@ func (a *AWS) EC2s(amis []*ec2.Image) ([]*ec2.Instance, error) {
 		},
 	)
 	if err != nil {
-		return output, fmt.Errorf("failed to describe instances: %w", err)
+		return output, fmt.Errorf("%w", ErrDesribeInstances)
 	}
 
 	return output, err
@@ -116,6 +121,10 @@ func (a *AWS) FilterAMIs(amis []*ec2.Image, ec2s []*ec2.Instance) ([]*ec2.Image,
 		}
 	}
 
+	if a.filterErr {
+		return output, ErrFilterAMIs
+	}
+
 	return output, err
 }
 
@@ -123,39 +132,49 @@ func (a *AWS) FilterAMIs(amis []*ec2.Image, ec2s []*ec2.Instance) ([]*ec2.Image,
 // associated with the deregistered AMI. Returns a list of IDs that were successfully
 // deleted. If DryDrun == true does not actually delete.
 func (a *AWS) DeleteAMIs(amis []*ec2.Image) ([]string, error) {
-	var err error
 	var output []string
+	eda := &ErrDeleteAMIs{}
 
 	for _, ami := range amis {
-		if !a.cfg.DryRun {
-			amiI := &ec2.DeregisterImageInput{
-				ImageId: ami.ImageId,
-			}
-			_, err := a.ec2.DeregisterImage(amiI)
-			if err != nil {
-				err = fmt.Errorf("failed to deregister ami %v: %w", ami.ImageId, err)
-			}
+		amiI := &ec2.DeregisterImageInput{
+			ImageId: ami.ImageId,
+			DryRun:  aws.Bool(a.cfg.DryRun),
 		}
-		output = append(output, *ami.ImageId)
+		_, err := a.ec2.DeregisterImage(amiI)
+		if err != nil {
+			var awsErr awserr.Error
+			if errors.As(err, &awsErr) && awsErr.Code() == "DryRunOperation" {
+				output = append(output, *ami.ImageId)
+			} else {
+				eda.Append(*ami.ImageId)
+			}
+		} else {
+			output = append(output, *ami.ImageId)
+		}
 
 		for _, bdm := range ami.BlockDeviceMappings {
 			if bdm.Ebs != nil {
-				if !a.cfg.DryRun {
-					snapID := bdm.Ebs.SnapshotId
-					snapI := &ec2.DeleteSnapshotInput{
-						SnapshotId: snapID,
-					}
-					_, err := a.ec2.DeleteSnapshot(snapI)
-					if err != nil {
-						err = fmt.Errorf("failed to deregister ami %v: %w", ami.ImageId, err)
-					}
+				snapID := bdm.Ebs.SnapshotId
+				snapI := &ec2.DeleteSnapshotInput{
+					SnapshotId: snapID,
+					DryRun:     aws.Bool(a.cfg.DryRun),
 				}
-				output = append(output, *bdm.Ebs.SnapshotId)
+				_, err := a.ec2.DeleteSnapshot(snapI)
+				if err != nil {
+					var awsErr awserr.Error
+					if errors.As(err, &awsErr) && awsErr.Code() == "DryRunOperation" {
+						output = append(output, *bdm.Ebs.SnapshotId)
+					} else {
+						eda.Append(*snapID)
+					}
+				} else {
+					output = append(output, *bdm.Ebs.SnapshotId)
+				}
 			}
 		}
 	}
 
-	return output, err
+	return output, eda.ErrorOrNil()
 }
 
 // DeleteUnusedAMIs finds and deletes all AMIs (and their associated snapshots)
@@ -166,22 +185,22 @@ func (a *AWS) DeleteUnusedAMIs() ([]string, error) {
 
 	amis, err := a.AMIs()
 	if err != nil {
-		return output, fmt.Errorf("failed to describe AMIs: %w", err)
+		return output, err
 	}
 
 	ec2s, err := a.EC2s(amis)
 	if err != nil {
-		return output, fmt.Errorf("failed to describe EC2s: %w", err)
+		return output, err
 	}
 
 	amis, err = a.FilterAMIs(amis, ec2s)
 	if err != nil {
-		return output, fmt.Errorf("failed to filter AMIs: %w", err)
+		return output, err
 	}
 
 	output, err = a.DeleteAMIs(amis)
 	if err != nil {
-		return output, fmt.Errorf("failed to delete all AMIs and snapshots: %w", err)
+		return output, err
 	}
 
 	return output, err
