@@ -2,23 +2,22 @@ package main
 
 import (
 	"fmt"
-	"log"
 
-	"github.com/lingrino/cami/cami"
+	"github.com/lingrino/cami/cmd"
 )
 
+// version is populated at build time by goreleaser
+var version = "dev"
+
+// executeF is the function that should be used to call `cami`
+var executeF = cmd.Execute
+
+// main is the primary entrypoint to the application
 func main() {
-	aws, err := cami.NewAWS(&cami.Config{DryRun: true})
-	if err != nil {
-		log.Fatal(err)
-	}
+	var err error
 
-	err = aws.Auth()
+	err = executeF(version)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
 	}
-
-	deleted, err := aws.DeleteUnusedAMIs()
-	fmt.Println(err)
-	fmt.Println(deleted)
 }
