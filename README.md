@@ -24,6 +24,13 @@ Flags:
   -h, --help     help for cami
 ```
 
+```shell
+$ cami
+Successfully deleted:
+  ami-002d2dbacdfc0420b
+  snap-0f3c81d418d295671
+```
+
 ## Limitations
 
 Cami works by describing all of the AMIs in your account and all of your EC2 instances. It then creates a list of AMIs you own that have no associated EC2 instances and deletes those AMIs and the snapshots backing them. Do not use cami in the following situations:
