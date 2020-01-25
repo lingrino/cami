@@ -1,10 +1,7 @@
-.PHONY: build docs fmt install test
+.PHONY: build fmt install test
 
 build:
 	go build
-
-docs:
-	go run docs/generate.go
 
 fmt:
 	gofmt -l -w -s .

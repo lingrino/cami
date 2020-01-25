@@ -1,10 +1,26 @@
 # Cami
 
+TODO - badges (test cov, goreportcard, godoc)
+
 Cami is an API and CLI for removing unused AMIs from your AWS account.
 
 ## Usage
 
-TODO - docs
+For API docs see the [godoc] reference
+
+Cami requires that you are already authenticated with AWS and has no mechanism for passing credentials or other configuration directly. Cami uses the AWS Go SDK default credential chain. The easiest way is to have your environment variables or aws profile set up correctly. Make sure you have `AWS_REGION` set or you will get an error.
+
+```shell
+$ cami --help
+cami is an API and CLI for removing unused AMIs from your AWS account.
+
+Usage:
+  cami [flags]
+
+Flags:
+  -d, --dryrun   Set dryrun to true to run through the deletion without deleting any AMIs.
+  -h, --help     help for cami
+```
 
 ## Limitations
 
@@ -17,3 +33,5 @@ Cami works by describing all of the AMIs in your account and all of your EC2 ins
 ## Contributing
 
 I welcome issues and pull reuqests of all sizes! Especially those that resolve or mitigate the limitations listed above. Please open an issue if you're unsure that your change will be welcome.
+
+[godoc]: https://godoc.org/github.com/lingrino/cami/cami
