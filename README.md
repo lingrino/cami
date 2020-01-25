@@ -1,6 +1,10 @@
 # Cami
 
-TODO - badges (test cov, goreportcard, godoc)
+[![godoc](https://godoc.org/github.com/lingrino/cami/cami?status.svg)](https://godoc.org/github.com/lingrino/cami/cami)
+[![goreportcard](https://goreportcard.com/badge/github.com/lingrino/cami)](https://goreportcard.com/report/github.com/lingrino/cami)
+
+[![codecov](https://codecov.io/gh/lingrino/cami/branch/master/graph/badge.svg)](https://codecov.io/gh/lingrino/cami)
+[![workflow](https://img.shields.io/github/workflow/status/lingrino/cami/Validate/master?style=flat-square&logo=github)](https://github.com/lingrino/cami/actions?query=workflow%3AValidate)
 
 Cami is an API and CLI for removing unused AMIs from your AWS account.
 
