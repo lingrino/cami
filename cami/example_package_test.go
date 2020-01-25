@@ -8,7 +8,7 @@ import (
 	"github.com/lingrino/cami/cami"
 )
 
-func main() {
+func Example() {
 	var err error
 
 	aws, err := cami.NewAWS(&cami.Config{DryRun: false})
