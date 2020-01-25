@@ -14,4 +14,8 @@ jobs:
       - name: Go fmt
         run: test -z $(gofmt -l -w -s ./)
       - name: Run Tests
-        run: go test -cover -race -v ./...
+        run: go test -cover -race -v -coverprofile=coverage.txt -covermode=atomic ./...
+      - name: Upload Coverage
+        uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
