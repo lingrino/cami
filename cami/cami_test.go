@@ -63,7 +63,8 @@ func TestNewAWS(t *testing.T) {
 				assert.True(t, errors.Is(err, tt.wantErr), fmt.Sprintf("expected: %s\ngot: %s", tt.wantErr, err))
 			}
 
-			assert.Equal(t, tt.wantAWS, aws)
+			assert.Equal(t, tt.wantAWS.cfg, aws.cfg)
+			assert.Equal(t, tt.wantAWS.ec2, aws.ec2)
 		})
 	}
 }
