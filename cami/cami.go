@@ -36,7 +36,7 @@ func NewAWS(c *Config) (*AWS, error) {
 	a.newEC2Fn = ec2.New
 	a.newSessionFn = session.NewSession
 
-	return &AWS{cfg: c}, nil
+	return a, nil
 }
 
 // Auth sets up our AWS session and service clients

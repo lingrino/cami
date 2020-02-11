@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/lingrino/cami/cami"
@@ -27,12 +28,12 @@ func camiCmd() *cobra.Command {
 
 			aws, err := cami.NewAWS(&cami.Config{DryRun: dryrun})
 			if err != nil {
-				fmt.Printf("ERROR: %v\n", err)
+				log.Fatalf("ERROR: %v\n", err)
 			}
 
 			err = aws.Auth()
 			if err != nil {
-				fmt.Printf("ERROR: %v\n", err)
+				log.Fatalf("ERROR: %v\n", err)
 			}
 
 			deleted, err := aws.DeleteUnusedAMIs()
@@ -43,9 +44,9 @@ func camiCmd() *cobra.Command {
 			var eda *cami.ErrDeleteAMIs
 			if err != nil {
 				if errors.As(err, &eda) {
-					fmt.Printf("Failed to delete:\n  %s\n", strings.Join(eda.IDs, "\n  "))
+					log.Fatalf("Failed to delete:\n  %s\n", strings.Join(eda.IDs, "\n  "))
 				} else {
-					fmt.Printf("UNKNOWN ERROR: %v\n", err)
+					log.Fatalf("UNKNOWN ERROR: %v\n", err)
 				}
 			}
 			if len(deleted) > 0 {
