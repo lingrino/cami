@@ -1,6 +1,6 @@
 # Cami
 
-[![godoc](https://godoc.org/github.com/lingrino/cami/cami?status.svg)](https://godoc.org/github.com/lingrino/cami/cami)
+[![godoc](https://godoc.org/github.com/lingrino/cami/cami?status.svg)](https://pkg.go.dev/github.com/lingrino/cami/cami)
 [![goreportcard](https://goreportcard.com/badge/github.com/lingrino/cami)](https://goreportcard.com/report/github.com/lingrino/cami)
 [![codecov](https://codecov.io/gh/lingrino/cami/branch/master/graph/badge.svg)](https://codecov.io/gh/lingrino/cami)
 
