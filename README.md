@@ -43,4 +43,4 @@ Cami works by describing all of the AMIs in your account and all of your EC2 ins
 
 I welcome issues and pull reuqests of all sizes! Especially those that resolve or mitigate the limitations listed above. Please open an issue if you're unsure that your change will be welcome.
 
-[godoc]: https://godoc.org/github.com/lingrino/cami/cami
+[godoc]: https://pkg.go.dev/github.com/lingrino/cami/cami
