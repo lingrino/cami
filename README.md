@@ -1,6 +1,6 @@
 # Cami
 
-[![godoc](https://godoc.org/github.com/lingrino/cami/cami?status.svg)](https://godoc.org/github.com/lingrino/cami/cami)
+[![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat)](https://pkg.go.dev/github.com/lingrino/cami/cami)
 [![goreportcard](https://goreportcard.com/badge/github.com/lingrino/cami)](https://goreportcard.com/report/github.com/lingrino/cami)
 [![codecov](https://codecov.io/gh/lingrino/cami/branch/master/graph/badge.svg)](https://codecov.io/gh/lingrino/cami)
 
@@ -43,4 +43,4 @@ Cami works by describing all of the AMIs in your account and all of your EC2 ins
 
 I welcome issues and pull reuqests of all sizes! Especially those that resolve or mitigate the limitations listed above. Please open an issue if you're unsure that your change will be welcome.
 
-[godoc]: https://godoc.org/github.com/lingrino/cami/cami
+[godoc]: https://pkg.go.dev/github.com/lingrino/cami/cami

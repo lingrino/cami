@@ -16,10 +16,8 @@ func TestNewAWS(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-
-		give *Config
-
+		name    string
+		give    *Config
 		wantAWS *AWS
 		wantErr error
 	}{
@@ -65,7 +63,8 @@ func TestNewAWS(t *testing.T) {
 				assert.True(t, errors.Is(err, tt.wantErr), fmt.Sprintf("expected: %s\ngot: %s", tt.wantErr, err))
 			}
 
-			assert.Equal(t, tt.wantAWS, aws)
+			assert.Equal(t, tt.wantAWS.cfg, aws.cfg)
+			assert.Equal(t, tt.wantAWS.ec2, aws.ec2)
 		})
 	}
 }
@@ -74,37 +73,33 @@ func TestAuth(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-
-		give         *AWS
-		newSessionFn func(cfgs ...*aws.Config) (*session.Session, error)
-		newEC2Fn     func(p client.ConfigProvider, cfgs ...*aws.Config) *ec2.EC2
-
+		name    string
+		give    *AWS
 		wantAWS *AWS
 		wantErr error
 	}{
 		{
-			name:         "error",
-			give:         &AWS{},
-			newSessionFn: func(cfgs ...*aws.Config) (*session.Session, error) { return nil, fmt.Errorf("FAIL") },
-			wantAWS:      &AWS{},
-			wantErr:      ErrCreateSession,
+			name: "error",
+			give: &AWS{
+				newSessionFn: func(cfgs ...*aws.Config) (*session.Session, error) { return nil, fmt.Errorf("FAIL") },
+			},
+			wantAWS: &AWS{},
+			wantErr: ErrCreateSession,
 		},
 		{
-			name:         "valid",
-			give:         &AWS{},
-			newSessionFn: func(cfgs ...*aws.Config) (*session.Session, error) { return &session.Session{}, nil },
-			newEC2Fn:     func(p client.ConfigProvider, cfgs ...*aws.Config) *ec2.EC2 { return &ec2.EC2{} },
-			wantAWS:      &AWS{ec2: &ec2.EC2{}},
-			wantErr:      nil,
+			name: "valid",
+			give: &AWS{
+				newEC2Fn:     func(p client.ConfigProvider, cfgs ...*aws.Config) *ec2.EC2 { return &ec2.EC2{} },
+				newSessionFn: func(cfgs ...*aws.Config) (*session.Session, error) { return &session.Session{}, nil },
+			},
+			wantAWS: &AWS{ec2: &ec2.EC2{}},
+			wantErr: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			newSessionFn = tt.newSessionFn
-			newEC2Fn = tt.newEC2Fn
 			err := tt.give.Auth()
 
 			if tt.wantErr == nil {
@@ -113,7 +108,7 @@ func TestAuth(t *testing.T) {
 				assert.True(t, errors.Is(err, tt.wantErr), fmt.Sprintf("expected: %s\ngot: %s", tt.wantErr, err))
 			}
 
-			assert.Equal(t, tt.wantAWS, tt.give)
+			assert.Equal(t, tt.wantAWS.ec2, tt.give.ec2)
 		})
 	}
 }
@@ -122,13 +117,11 @@ func TestAMIs(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-
+		name       string
 		giveOutput ec2.DescribeImagesOutput
 		giveErr    error
-
-		wantAMIs []*ec2.Image
-		wantErr  error
+		wantAMIs   []*ec2.Image
+		wantErr    error
 	}{
 		{
 			name:       "empty",
@@ -202,15 +195,13 @@ func TestEC2s(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-
+		name       string
 		giveImages []*ec2.Image
 		giveOutput ec2.DescribeInstancesOutput
 		giveErr    error
 		givePages  int
-
-		wantEC2s []*ec2.Instance
-		wantErr  error
+		wantEC2s   []*ec2.Instance
+		wantErr    error
 	}{
 		{
 			name:       "empty",
@@ -324,11 +315,9 @@ func TestFilterAMIs(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-
+		name     string
 		giveAMIs []*ec2.Image
 		giveEC2s []*ec2.Instance
-
 		wantAMIs []*ec2.Image
 		wantErr  error
 	}{
@@ -387,16 +376,14 @@ func TestDeleteAMIs(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-
+		name                   string
 		giveAMIs               []*ec2.Image
 		giveDeregisterImage    ec2.DeregisterImageOutput
 		giveDeregisterImageErr error
 		giveDeleteSnapshot     ec2.DeleteSnapshotOutput
 		giveDeleteSnapshotErr  error
-
-		wantIDs []string
-		wantErr error
+		wantIDs                []string
+		wantErr                error
 	}{
 		{
 			name:                   "nil",
@@ -589,10 +576,8 @@ func TestDeleteUnusedAMIs(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-
-		give *AWS
-
+		name    string
+		give    *AWS
 		wantIDs []string
 		wantErr error
 	}{
@@ -720,11 +705,13 @@ func TestDeleteUnusedAMIs(t *testing.T) {
 			ids, err := tt.give.DeleteUnusedAMIs()
 
 			var eda *ErrDeleteAMIs
-			if tt.wantErr == nil {
+
+			switch {
+			case tt.wantErr == nil:
 				assert.Nil(t, err)
-			} else if errors.As(err, &eda) {
+			case errors.As(err, &eda):
 				assert.Equal(t, tt.wantErr, err)
-			} else {
+			default:
 				assert.True(t, errors.Is(err, tt.wantErr), fmt.Sprintf("expected: %s\ngot: %s", tt.wantErr, err))
 			}
 

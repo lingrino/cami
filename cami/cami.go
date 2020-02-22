@@ -6,13 +6,11 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 )
-
-var newEC2Fn = ec2.New
-var newSessionFn = session.NewSession
 
 // Config holds the configuration for our AWS struct
 type Config struct {
@@ -24,26 +22,33 @@ type Config struct {
 type AWS struct {
 	cfg *Config
 
-	ec2 ec2iface.EC2API
-
-	filterErr bool
+	// Used for testing
+	ec2          ec2iface.EC2API
+	filterErr    bool
+	newEC2Fn     func(client.ConfigProvider, ...*aws.Config) *ec2.EC2
+	newSessionFn func(...*aws.Config) (*session.Session, error)
 }
 
 // NewAWS returns a new AWS struct
 func NewAWS(c *Config) (*AWS, error) {
-	return &AWS{cfg: c}, nil
+	a := &AWS{cfg: c}
+
+	a.newEC2Fn = ec2.New
+	a.newSessionFn = session.NewSession
+
+	return a, nil
 }
 
 // Auth sets up our AWS session and service clients
 func (a *AWS) Auth() error {
 	var err error
 
-	sess, err := newSessionFn()
+	sess, err := a.newSessionFn()
 	if err != nil {
 		return fmt.Errorf("%w", ErrCreateSession)
 	}
 
-	ec2 := newEC2Fn(sess)
+	ec2 := a.newEC2Fn(sess)
 	a.ec2 = ec2
 
 	return err
@@ -71,7 +76,7 @@ func (a *AWS) EC2s(amis []*ec2.Image) ([]*ec2.Instance, error) {
 	var err error
 	var output []*ec2.Instance
 
-	var amiIDs []*string
+	amiIDs := make([]*string, len(amis))
 	for _, ami := range amis {
 		amiIDs = append(amiIDs, ami.ImageId)
 	}
