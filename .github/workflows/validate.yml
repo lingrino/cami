@@ -16,7 +16,7 @@ jobs:
       - name: Run Tests
         run: go test -cover -race -v ./...
       - name: Upload Coverage
-        uses: paambaati/codeclimate-action
+        uses: paambaati/codeclimate-action@master
         env:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
         with:
