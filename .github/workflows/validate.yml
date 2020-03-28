@@ -14,13 +14,10 @@ jobs:
       - name: Go fmt
         run: test -z $(gofmt -l -w -s ./)
       - name: Run Tests
-        run: go test -cover -race -v -coverprofile=c.out -covermode=atomic ./...
-      - name: Test
-        run: echo "$GIT_BRANCH"
+        run: go test -cover -race -v ./...
+      - name: Upload Coverage
+        uses: paambaati/codeclimate-action@latest
         env:
-          GIT_BRANCH: ${{ github.ref }}
-      # - name: Upload Coverage
-      #   run: cc-test-reporter before-build
-      #   env:
-      #     GIT_BRANCH: ${{ github.ref }}
-      #     CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
+          CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
+        with:
+          coverageCommand: go test -cover -coverprofile=c.out -covermode=atomic ./...
