@@ -11,11 +11,14 @@ jobs:
         uses: actions/checkout@master
         with:
           fetch-depth: 1
+      - name: Set Environment Variables
+        run: |
+          echo "::set-env name=GIT_BRANCH::${GITHUB_SHA##*/}"
+          echo "::set-env name=GIT_COMMIT_SHA::${GITHUB_SHA}"
       - name: Go fmt
         run: test -z $(gofmt -l -w -s ./)
       - name: Prep Coverage
         run: |
-          export GIT_BRANCH="${GITHUB_REF/refs\/heads\//}"
           cc-test-reporter before-build
         env:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
@@ -23,7 +26,6 @@ jobs:
         run: go test -cover -coverprofile=c.out -covermode=atomic -race -v ./...
       - name: Upload Coverage
         run: |
-          export GIT_BRANCH="${GITHUB_REF/refs\/heads\//}"
           cc-test-reporter after-build --coverage-input-type gocov --exit-code $?
         env:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
