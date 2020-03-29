@@ -13,7 +13,7 @@ jobs:
           fetch-depth: 1
       - name: Set Environment Variables
         run: |
-          echo "::set-env name=GIT_BRANCH::${GITHUB_SHA##*/}"
+          echo "::set-env name=GIT_BRANCH::${GITHUB_REF##*/}"
           echo "::set-env name=GIT_COMMIT_SHA::${GITHUB_SHA}"
       - name: Go fmt
         run: test -z $(gofmt -l -w -s ./)
