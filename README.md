@@ -4,6 +4,7 @@
 [![goreportcard](https://goreportcard.com/badge/github.com/lingrino/cami)](https://goreportcard.com/report/github.com/lingrino/cami)
 [![Maintainability](https://api.codeclimate.com/v1/badges/9dfa18d69da6065c9e5c/maintainability)](https://codeclimate.com/github/lingrino/cami/maintainability)
 [![Test Coverage](https://api.codeclimate.com/v1/badges/9dfa18d69da6065c9e5c/test_coverage)](https://codeclimate.com/github/lingrino/cami/test_coverage)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/1e6ded484d4c4df0936f6607c562b6cb)](https://www.codacy.com/manual/lingrino/cami)
 
 Cami is an API and CLI for removing unused AMIs from your AWS account.
 
