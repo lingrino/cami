@@ -11,10 +11,10 @@ jobs:
         uses: actions/checkout@master
         with:
           fetch-depth: 1
-      - name: Set Environment Variables
-        run: |
-          echo "::set-env name=GIT_BRANCH::${GITHUB_REF##*/}"
-          echo "::set-env name=GIT_COMMIT_SHA::${GITHUB_SHA}"
+      # - name: Set Environment Variables
+      #   run: |
+      #     echo "::set-env name=GIT_BRANCH::${GITHUB_REF##*/}"
+      #     echo "::set-env name=GIT_COMMIT_SHA::${GITHUB_SHA}"
       - name: Go fmt
         run: test -z $(gofmt -l -w -s ./)
       - name: Prep Coverage
@@ -26,6 +26,6 @@ jobs:
         run: go test -cover -coverprofile=c.out -covermode=atomic -race -v ./...
       - name: Upload Coverage
         run: |
-          cc-test-reporter after-build --coverage-input-type gocov
+          cc-test-reporter after-build -p github.com/lingrino/cami
         env:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
