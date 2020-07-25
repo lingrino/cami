@@ -43,7 +43,7 @@ brews:
     description: A CLI for cleaning up unused AWS AMIs.
     homepage: https://lingrino.com/
     skip_upload: auto
-    github:
+    tap:
       owner: lingrino
       name: homebrew-tap
     folder: Formula
