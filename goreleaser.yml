@@ -80,7 +80,11 @@ nfpms:
 dockers:
   - dockerfile: Dockerfile
     image_templates:
-      - lingrino/cami:latest
-      - lingrino/cami:{{ .Version }}
-      - lingrino/cami:{{ .Major }}
-      - lingrino/cami:{{ .Major }}.{{ .Minor }}
+      - ghcr.io/lingrino/cami:latest
+      - ghcr.io/lingrino/cami:{{ .Version }}
+      - ghcr.io/lingrino/cami:{{ .Major }}
+      - ghcr.io/lingrino/cami:{{ .Major }}.{{ .Minor }}
+    build_flag_templates:
+      - --label=org.opencontainers.image.created={{.Date}}
+      - --label=org.opencontainers.image.revision={{.FullCommit}}
+      - --label=org.opencontainers.image.version={{.Version}}

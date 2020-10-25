@@ -26,6 +26,7 @@ func (m mockEC2) DescribeImages(*ec2.DescribeImagesInput) (*ec2.DescribeImagesOu
 	return &m.RespDescImages, m.RespDescImagesErr
 }
 
+//nolint:lll
 func (m mockEC2) DescribeInstancesPages(in *ec2.DescribeInstancesInput, fn func(*ec2.DescribeInstancesOutput, bool) bool) error {
 	for i := 1; i <= m.RespDescInstancesPages; i++ {
 		if i == m.RespDescInstancesPages {
