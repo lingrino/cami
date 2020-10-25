@@ -12,13 +12,13 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 )
 
-// Config holds the configuration for our AWS struct
+// Config holds the configuration for our AWS struct.
 type Config struct {
 	// Set to true to run non-destructively
 	DryRun bool
 }
 
-// AWS is the main struct that holds our client and info
+// AWS is the main struct that holds our client and info.
 type AWS struct {
 	cfg *Config
 
@@ -29,7 +29,7 @@ type AWS struct {
 	newSessionFn func(...*aws.Config) (*session.Session, error)
 }
 
-// NewAWS returns a new AWS struct
+// NewAWS returns a new AWS struct.
 func NewAWS(c *Config) (*AWS, error) {
 	a := &AWS{cfg: c}
 
@@ -39,7 +39,7 @@ func NewAWS(c *Config) (*AWS, error) {
 	return a, nil
 }
 
-// Auth sets up our AWS session and service clients
+// Auth sets up our AWS session and service clients.
 func (a *AWS) Auth() error {
 	var err error
 
@@ -54,7 +54,7 @@ func (a *AWS) Auth() error {
 	return err
 }
 
-// AMIs returns a list of all our AMIs
+// AMIs returns a list of all our AMIs.
 func (a *AWS) AMIs() ([]*ec2.Image, error) {
 	var err error
 	var output []*ec2.Image
@@ -71,7 +71,7 @@ func (a *AWS) AMIs() ([]*ec2.Image, error) {
 	return output, err
 }
 
-// EC2s returns a list of all our EC2 instances using one of the AMIs in the list provided
+// EC2s returns a list of all our EC2 instances using one of the AMIs in the list provided.
 func (a *AWS) EC2s(amis []*ec2.Image) ([]*ec2.Instance, error) {
 	var err error
 	var output []*ec2.Instance
@@ -110,7 +110,7 @@ func (a *AWS) EC2s(amis []*ec2.Image) ([]*ec2.Instance, error) {
 	return output, err
 }
 
-// FilterAMIs returns back the list of AMIs with images in ec2s removed
+// FilterAMIs returns back the list of AMIs with images in ec2s removed.
 func (a *AWS) FilterAMIs(amis []*ec2.Image, ec2s []*ec2.Instance) ([]*ec2.Image, error) {
 	var err error
 	var output []*ec2.Image
@@ -158,23 +158,25 @@ func (a *AWS) DeleteAMIs(amis []*ec2.Image) ([]string, error) {
 		}
 
 		for _, bdm := range ami.BlockDeviceMappings {
-			if bdm.Ebs != nil {
-				snapID := bdm.Ebs.SnapshotId
-				snapI := &ec2.DeleteSnapshotInput{
-					SnapshotId: snapID,
-					DryRun:     aws.Bool(a.cfg.DryRun),
-				}
-				_, err := a.ec2.DeleteSnapshot(snapI)
-				if err != nil {
-					var awsErr awserr.Error
-					if errors.As(err, &awsErr) && awsErr.Code() == "DryRunOperation" {
-						output = append(output, *bdm.Ebs.SnapshotId)
-					} else {
-						eda.Append(*snapID)
-					}
-				} else {
+			if bdm.Ebs == nil {
+				continue
+			}
+
+			snapID := bdm.Ebs.SnapshotId
+			snapI := &ec2.DeleteSnapshotInput{
+				SnapshotId: snapID,
+				DryRun:     aws.Bool(a.cfg.DryRun),
+			}
+			_, err := a.ec2.DeleteSnapshot(snapI)
+			if err != nil {
+				var awsErr awserr.Error
+				if errors.As(err, &awsErr) && awsErr.Code() == "DryRunOperation" {
 					output = append(output, *bdm.Ebs.SnapshotId)
+				} else {
+					eda.Append(*snapID)
 				}
+			} else {
+				output = append(output, *bdm.Ebs.SnapshotId)
 			}
 		}
 	}

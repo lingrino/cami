@@ -14,7 +14,7 @@ const (
 	flagDryRunDesc = "Set dryrun to true to run through the deletion without deleting any AMIs."
 )
 
-// camiCmd returns our root cami command
+// camiCmd returns our root cami command.
 func camiCmd() *cobra.Command {
 	// dryrun determines if cami should test deletion but not actually delete the AMIs
 	var dryrun bool
@@ -60,7 +60,7 @@ func camiCmd() *cobra.Command {
 	return cmd
 }
 
-// Execute calls the command returned by camiCmd and sets the version flag passed from main.go
+// Execute calls the command returned by camiCmd and sets the version flag passed from main.go.
 func Execute(v string) error {
 	cami := camiCmd()
 	cami.AddCommand(versionCmd(v))
