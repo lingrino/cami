@@ -5,22 +5,6 @@ on:
   push:
 
 jobs:
-  docs:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.15 # https://golang.org/dl/
-      - name: Docs Check
-        run: |
-          before=$(cat docs/cli/*.md | md5sum)
-          go run main.go docs docs/cli
-          after=$(cat docs/cli/*.md | md5sum)
-          if [ "$before" != "$after" ]; then exit 1; fi
-        shell: bash
   golangci:
     runs-on: ubuntu-latest
     steps:
