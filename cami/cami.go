@@ -68,7 +68,7 @@ func (a *AWS) AMIs() ([]*ec2.Image, error) {
 	}
 
 	output = amiO.Images
-	return output, err
+	return output, nil
 }
 
 // EC2s returns a list of all our EC2 instances using one of the AMIs in the list provided.
@@ -107,7 +107,7 @@ func (a *AWS) EC2s(amis []*ec2.Image) ([]*ec2.Instance, error) {
 		return output, fmt.Errorf("%w", ErrDesribeInstances)
 	}
 
-	return output, err
+	return output, nil
 }
 
 // FilterAMIs returns back the list of AMIs with images in ec2s removed.

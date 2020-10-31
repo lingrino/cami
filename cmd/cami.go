@@ -67,8 +67,8 @@ func Execute(v string) error {
 
 	err := cami.Execute()
 	if err != nil {
-		return err
+		return fmt.Errorf("execute: %w", err)
 	}
 
-	return err
+	return nil
 }
