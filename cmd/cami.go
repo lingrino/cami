@@ -1,3 +1,4 @@
+// Package cmd provides a CLI for the cami package
 package cmd
 
 import (

@@ -1,14 +1,15 @@
 package cami
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/client"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -81,7 +82,9 @@ func TestAuth(t *testing.T) {
 		{
 			name: "error",
 			give: &AWS{
-				newSessionFn: func(cfgs ...*aws.Config) (*session.Session, error) { return nil, fmt.Errorf("FAIL") },
+				newConfigFn: func(context.Context, ...func(*config.LoadOptions) error) (aws.Config, error) {
+					return aws.Config{}, fmt.Errorf("FAIL")
+				},
 			},
 			wantAWS: &AWS{},
 			wantErr: ErrCreateSession,
@@ -89,10 +92,12 @@ func TestAuth(t *testing.T) {
 		{
 			name: "valid",
 			give: &AWS{
-				newEC2Fn:     func(p client.ConfigProvider, cfgs ...*aws.Config) *ec2.EC2 { return &ec2.EC2{} },
-				newSessionFn: func(cfgs ...*aws.Config) (*session.Session, error) { return &session.Session{}, nil },
+				newEC2Fn: func(aws.Config, ...func(*ec2.Options)) *ec2.Client { return &ec2.Client{} },
+				newConfigFn: func(context.Context, ...func(*config.LoadOptions) error) (aws.Config, error) {
+					return aws.Config{}, nil
+				},
 			},
-			wantAWS: &AWS{ec2: &ec2.EC2{}},
+			wantAWS: &AWS{ec2: &ec2.Client{}},
 			wantErr: nil,
 		},
 	}
@@ -122,7 +127,7 @@ func TestAMIs(t *testing.T) {
 		name       string
 		giveOutput ec2.DescribeImagesOutput
 		giveErr    error
-		wantAMIs   []*ec2.Image
+		wantAMIs   []types.Image
 		wantErr    error
 	}{
 		{
@@ -142,13 +147,13 @@ func TestAMIs(t *testing.T) {
 		{
 			name: "images",
 			giveOutput: ec2.DescribeImagesOutput{
-				Images: []*ec2.Image{
+				Images: []types.Image{
 					{ImageId: aws.String("ami-123")},
 					{ImageId: aws.String("ami-456")},
 				},
 			},
 			giveErr: nil,
-			wantAMIs: []*ec2.Image{
+			wantAMIs: []types.Image{
 				{ImageId: aws.String("ami-123")},
 				{ImageId: aws.String("ami-456")},
 			},
@@ -157,7 +162,7 @@ func TestAMIs(t *testing.T) {
 		{
 			name: "images with error",
 			giveOutput: ec2.DescribeImagesOutput{
-				Images: []*ec2.Image{
+				Images: []types.Image{
 					{ImageId: aws.String("ami-123")},
 					{ImageId: aws.String("ami-456")},
 				},
@@ -198,46 +203,43 @@ func TestEC2s(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		giveImages []*ec2.Image
+		giveImages []types.Image
 		giveOutput ec2.DescribeInstancesOutput
 		giveErr    error
 		givePages  int
-		wantEC2s   []*ec2.Instance
+		wantEC2s   []types.Instance
 		wantErr    error
 	}{
 		{
 			name:       "empty",
-			giveImages: []*ec2.Image{},
+			giveImages: []types.Image{},
 			giveOutput: ec2.DescribeInstancesOutput{},
 			giveErr:    nil,
-			givePages:  0,
 			wantEC2s:   nil,
 			wantErr:    nil,
 		},
 		{
 			name:       "error",
-			giveImages: []*ec2.Image{},
+			giveImages: []types.Image{},
 			giveOutput: ec2.DescribeInstancesOutput{},
 			giveErr:    fmt.Errorf("FAIL"),
-			givePages:  0,
 			wantEC2s:   nil,
 			wantErr:    ErrDesribeInstances,
 		},
 		{
 			name: "one reservation",
-			giveImages: []*ec2.Image{
+			giveImages: []types.Image{
 				{ImageId: aws.String("ami-123")},
 				{ImageId: aws.String("ami-456")},
 			},
 			giveOutput: ec2.DescribeInstancesOutput{
-				Reservations: []*ec2.Reservation{{Instances: []*ec2.Instance{
+				Reservations: []types.Reservation{{Instances: []types.Instance{
 					{ImageId: aws.String("ami-123")},
 					{ImageId: aws.String("ami-456")},
 				}}},
 			},
-			giveErr:   nil,
-			givePages: 1,
-			wantEC2s: []*ec2.Instance{
+			giveErr: nil,
+			wantEC2s: []types.Instance{
 				{ImageId: aws.String("ami-123")},
 				{ImageId: aws.String("ami-456")},
 			},
@@ -245,19 +247,18 @@ func TestEC2s(t *testing.T) {
 		},
 		{
 			name: "two reservations",
-			giveImages: []*ec2.Image{
+			giveImages: []types.Image{
 				{ImageId: aws.String("ami-123")},
 				{ImageId: aws.String("ami-456")},
 			},
 			giveOutput: ec2.DescribeInstancesOutput{
-				Reservations: []*ec2.Reservation{
-					{Instances: []*ec2.Instance{{ImageId: aws.String("ami-123")}}},
-					{Instances: []*ec2.Instance{{ImageId: aws.String("ami-456")}}},
+				Reservations: []types.Reservation{
+					{Instances: []types.Instance{{ImageId: aws.String("ami-123")}}},
+					{Instances: []types.Instance{{ImageId: aws.String("ami-456")}}},
 				},
 			},
-			giveErr:   nil,
-			givePages: 1,
-			wantEC2s: []*ec2.Instance{
+			giveErr: nil,
+			wantEC2s: []types.Instance{
 				{ImageId: aws.String("ami-123")},
 				{ImageId: aws.String("ami-456")},
 			},
@@ -265,21 +266,18 @@ func TestEC2s(t *testing.T) {
 		},
 		{
 			name: "two pages",
-			giveImages: []*ec2.Image{
+			giveImages: []types.Image{
 				{ImageId: aws.String("ami-123")},
 				{ImageId: aws.String("ami-456")},
 			},
 			giveOutput: ec2.DescribeInstancesOutput{
-				Reservations: []*ec2.Reservation{
-					{Instances: []*ec2.Instance{{ImageId: aws.String("ami-123")}}},
-					{Instances: []*ec2.Instance{{ImageId: aws.String("ami-456")}}},
+				Reservations: []types.Reservation{
+					{Instances: []types.Instance{{ImageId: aws.String("ami-123")}}},
+					{Instances: []types.Instance{{ImageId: aws.String("ami-456")}}},
 				},
 			},
-			giveErr:   nil,
-			givePages: 2,
-			wantEC2s: []*ec2.Instance{
-				{ImageId: aws.String("ami-123")},
-				{ImageId: aws.String("ami-456")},
+			giveErr: nil,
+			wantEC2s: []types.Instance{
 				{ImageId: aws.String("ami-123")},
 				{ImageId: aws.String("ami-456")},
 			},
@@ -294,9 +292,8 @@ func TestEC2s(t *testing.T) {
 
 			aws := AWS{
 				ec2: &mockEC2{
-					RespDescInstances:      tt.giveOutput,
-					RespDescInstancesErr:   tt.giveErr,
-					RespDescInstancesPages: tt.givePages,
+					RespDescInstances:    tt.giveOutput,
+					RespDescInstancesErr: tt.giveErr,
 				},
 			}
 
@@ -318,9 +315,9 @@ func TestFilterAMIs(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		giveAMIs []*ec2.Image
-		giveEC2s []*ec2.Instance
-		wantAMIs []*ec2.Image
+		giveAMIs []types.Image
+		giveEC2s []types.Instance
+		wantAMIs []types.Image
 		wantErr  error
 	}{
 		{
@@ -332,22 +329,22 @@ func TestFilterAMIs(t *testing.T) {
 		},
 		{
 			name:     "empty",
-			giveAMIs: []*ec2.Image{},
-			giveEC2s: []*ec2.Instance{},
+			giveAMIs: []types.Image{},
+			giveEC2s: []types.Instance{},
 			wantAMIs: nil,
 			wantErr:  nil,
 		},
 		{
 			name: "filter",
-			giveAMIs: []*ec2.Image{
+			giveAMIs: []types.Image{
 				{ImageId: aws.String("ami-123")},
 				{ImageId: aws.String("ami-456")},
 			},
-			giveEC2s: []*ec2.Instance{
+			giveEC2s: []types.Instance{
 				{ImageId: aws.String("ami-456")},
 				{ImageId: aws.String("ami-789")},
 			},
-			wantAMIs: []*ec2.Image{
+			wantAMIs: []types.Image{
 				{ImageId: aws.String("ami-123")},
 			},
 			wantErr: nil,
@@ -379,7 +376,7 @@ func TestDeleteAMIs(t *testing.T) {
 
 	tests := []struct {
 		name                   string
-		giveAMIs               []*ec2.Image
+		giveAMIs               []types.Image
 		giveDeregisterImage    ec2.DeregisterImageOutput
 		giveDeregisterImageErr error
 		giveDeleteSnapshot     ec2.DeleteSnapshotOutput
@@ -399,7 +396,7 @@ func TestDeleteAMIs(t *testing.T) {
 		},
 		{
 			name:                   "empty",
-			giveAMIs:               []*ec2.Image{},
+			giveAMIs:               []types.Image{},
 			giveDeregisterImage:    ec2.DeregisterImageOutput{},
 			giveDeregisterImageErr: nil,
 			giveDeleteSnapshot:     ec2.DeleteSnapshotOutput{},
@@ -409,7 +406,7 @@ func TestDeleteAMIs(t *testing.T) {
 		},
 		{
 			name: "deregister image error",
-			giveAMIs: []*ec2.Image{
+			giveAMIs: []types.Image{
 				{ImageId: aws.String("ami-123")},
 				{ImageId: aws.String("ami-456")},
 			},
@@ -424,12 +421,12 @@ func TestDeleteAMIs(t *testing.T) {
 		},
 		{
 			name: "delete snapshot error",
-			giveAMIs: []*ec2.Image{
+			giveAMIs: []types.Image{
 				{
 					ImageId: aws.String("ami-123"),
-					BlockDeviceMappings: []*ec2.BlockDeviceMapping{
+					BlockDeviceMappings: []types.BlockDeviceMapping{
 						{
-							Ebs: &ec2.EbsBlockDevice{
+							Ebs: &types.EbsBlockDevice{
 								SnapshotId: aws.String("snap-123"),
 							},
 						},
@@ -447,7 +444,7 @@ func TestDeleteAMIs(t *testing.T) {
 		},
 		{
 			name: "images no snaps",
-			giveAMIs: []*ec2.Image{
+			giveAMIs: []types.Image{
 				{ImageId: aws.String("ami-123")},
 				{ImageId: aws.String("ami-456")},
 			},
@@ -463,7 +460,7 @@ func TestDeleteAMIs(t *testing.T) {
 		},
 		{
 			name: "images no snaps dry run",
-			giveAMIs: []*ec2.Image{
+			giveAMIs: []types.Image{
 				{ImageId: aws.String("ami-123")},
 				{ImageId: aws.String("ami-456")},
 			},
@@ -479,12 +476,12 @@ func TestDeleteAMIs(t *testing.T) {
 		},
 		{
 			name: "images and snaps dry run",
-			giveAMIs: []*ec2.Image{
+			giveAMIs: []types.Image{
 				{
 					ImageId: aws.String("ami-123"),
-					BlockDeviceMappings: []*ec2.BlockDeviceMapping{
+					BlockDeviceMappings: []types.BlockDeviceMapping{
 						{
-							Ebs: &ec2.EbsBlockDevice{
+							Ebs: &types.EbsBlockDevice{
 								SnapshotId: aws.String("snap-123"),
 							},
 						},
@@ -503,12 +500,12 @@ func TestDeleteAMIs(t *testing.T) {
 		},
 		{
 			name: "images and snaps",
-			giveAMIs: []*ec2.Image{
+			giveAMIs: []types.Image{
 				{
 					ImageId: aws.String("ami-123"),
-					BlockDeviceMappings: []*ec2.BlockDeviceMapping{
+					BlockDeviceMappings: []types.BlockDeviceMapping{
 						{
-							Ebs: &ec2.EbsBlockDevice{
+							Ebs: &types.EbsBlockDevice{
 								SnapshotId: aws.String("snap-123"),
 							},
 						},
@@ -516,14 +513,14 @@ func TestDeleteAMIs(t *testing.T) {
 				},
 				{
 					ImageId: aws.String("ami-456"),
-					BlockDeviceMappings: []*ec2.BlockDeviceMapping{
+					BlockDeviceMappings: []types.BlockDeviceMapping{
 						{
-							Ebs: &ec2.EbsBlockDevice{
+							Ebs: &types.EbsBlockDevice{
 								SnapshotId: aws.String("snap-456"),
 							},
 						},
 						{
-							Ebs: &ec2.EbsBlockDevice{
+							Ebs: &types.EbsBlockDevice{
 								SnapshotId: aws.String("snap-789"),
 							},
 						},
@@ -590,9 +587,8 @@ func TestDeleteUnusedAMIs(t *testing.T) {
 					RespDescImages:    ec2.DescribeImagesOutput{},
 					RespDescImagesErr: nil,
 
-					RespDescInstances:      ec2.DescribeInstancesOutput{},
-					RespDescInstancesErr:   nil,
-					RespDescInstancesPages: 1,
+					RespDescInstances:    ec2.DescribeInstancesOutput{},
+					RespDescInstancesErr: nil,
 
 					RespDeregisterImage:    ec2.DeregisterImageOutput{},
 					RespDeregisterImageErr: nil,
@@ -611,9 +607,8 @@ func TestDeleteUnusedAMIs(t *testing.T) {
 					RespDescImages:    ec2.DescribeImagesOutput{},
 					RespDescImagesErr: fmt.Errorf("FAIL"),
 
-					RespDescInstances:      ec2.DescribeInstancesOutput{},
-					RespDescInstancesErr:   nil,
-					RespDescInstancesPages: 1,
+					RespDescInstances:    ec2.DescribeInstancesOutput{},
+					RespDescInstancesErr: nil,
 
 					RespDeregisterImage:    ec2.DeregisterImageOutput{},
 					RespDeregisterImageErr: nil,
@@ -632,9 +627,8 @@ func TestDeleteUnusedAMIs(t *testing.T) {
 					RespDescImages:    ec2.DescribeImagesOutput{},
 					RespDescImagesErr: nil,
 
-					RespDescInstances:      ec2.DescribeInstancesOutput{},
-					RespDescInstancesErr:   nil,
-					RespDescInstancesPages: 1,
+					RespDescInstances:    ec2.DescribeInstancesOutput{},
+					RespDescInstancesErr: nil,
 
 					RespDeregisterImage:    ec2.DeregisterImageOutput{},
 					RespDeregisterImageErr: nil,
@@ -654,9 +648,8 @@ func TestDeleteUnusedAMIs(t *testing.T) {
 					RespDescImages:    ec2.DescribeImagesOutput{},
 					RespDescImagesErr: nil,
 
-					RespDescInstances:      ec2.DescribeInstancesOutput{},
-					RespDescInstancesErr:   fmt.Errorf("FAIL"),
-					RespDescInstancesPages: 1,
+					RespDescInstances:    ec2.DescribeInstancesOutput{},
+					RespDescInstancesErr: fmt.Errorf("FAIL"),
 
 					RespDeregisterImage:    ec2.DeregisterImageOutput{},
 					RespDeregisterImageErr: nil,
@@ -673,16 +666,15 @@ func TestDeleteUnusedAMIs(t *testing.T) {
 			give: &AWS{
 				ec2: &mockEC2{
 					RespDescImages: ec2.DescribeImagesOutput{
-						Images: []*ec2.Image{
+						Images: []types.Image{
 							{ImageId: aws.String("ami-123")},
 							{ImageId: aws.String("ami-456")},
 						},
 					},
 					RespDescImagesErr: nil,
 
-					RespDescInstances:      ec2.DescribeInstancesOutput{},
-					RespDescInstancesErr:   nil,
-					RespDescInstancesPages: 1,
+					RespDescInstances:    ec2.DescribeInstancesOutput{},
+					RespDescInstancesErr: nil,
 
 					RespDeregisterImage:    ec2.DeregisterImageOutput{},
 					RespDeregisterImageErr: fmt.Errorf("FAIL"),
