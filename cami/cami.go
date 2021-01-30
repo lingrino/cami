@@ -1,16 +1,24 @@
+// Package cami provides a simple service for keeping AMIs clean.
 package cami
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/client"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
 )
+
+type ec2If interface {
+	DescribeImages(context.Context, *ec2.DescribeImagesInput, ...func(*ec2.Options)) (*ec2.DescribeImagesOutput, error)
+	DescribeInstances(context.Context, *ec2.DescribeInstancesInput, ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error)
+	DeregisterImage(context.Context, *ec2.DeregisterImageInput, ...func(*ec2.Options)) (*ec2.DeregisterImageOutput, error)
+	DeleteSnapshot(context.Context, *ec2.DeleteSnapshotInput, ...func(*ec2.Options)) (*ec2.DeleteSnapshotOutput, error)
+}
 
 // Config holds the configuration for our AWS struct.
 type Config struct {
@@ -23,18 +31,18 @@ type AWS struct {
 	cfg *Config
 
 	// Used for testing
-	ec2          ec2iface.EC2API
-	filterErr    bool
-	newEC2Fn     func(client.ConfigProvider, ...*aws.Config) *ec2.EC2
-	newSessionFn func(...*aws.Config) (*session.Session, error)
+	ec2         ec2If
+	filterErr   bool
+	newEC2Fn    func(aws.Config, ...func(*ec2.Options)) *ec2.Client
+	newConfigFn func(context.Context, ...func(*config.LoadOptions) error) (aws.Config, error)
 }
 
 // NewAWS returns a new AWS struct.
 func NewAWS(c *Config) (*AWS, error) {
 	a := &AWS{cfg: c}
 
-	a.newEC2Fn = ec2.New
-	a.newSessionFn = session.NewSession
+	a.newEC2Fn = ec2.NewFromConfig
+	a.newConfigFn = config.LoadDefaultConfig
 
 	return a, nil
 }
@@ -43,26 +51,26 @@ func NewAWS(c *Config) (*AWS, error) {
 func (a *AWS) Auth() error {
 	var err error
 
-	sess, err := a.newSessionFn()
+	cfg, err := a.newConfigFn(context.TODO())
 	if err != nil {
 		return fmt.Errorf("%w", ErrCreateSession)
 	}
 
-	ec2 := a.newEC2Fn(sess)
+	ec2 := a.newEC2Fn(cfg)
 	a.ec2 = ec2
 
 	return err
 }
 
 // AMIs returns a list of all our AMIs.
-func (a *AWS) AMIs() ([]*ec2.Image, error) {
+func (a *AWS) AMIs() ([]types.Image, error) {
 	var err error
-	var output []*ec2.Image
+	var output []types.Image
 
 	amiI := &ec2.DescribeImagesInput{
-		Owners: []*string{aws.String("self")},
+		Owners: []string{"self"},
 	}
-	amiO, err := a.ec2.DescribeImages(amiI)
+	amiO, err := a.ec2.DescribeImages(context.TODO(), amiI)
 	if err != nil {
 		return output, fmt.Errorf("%w", ErrDesribeImages)
 	}
@@ -72,48 +80,49 @@ func (a *AWS) AMIs() ([]*ec2.Image, error) {
 }
 
 // EC2s returns a list of all our EC2 instances using one of the AMIs in the list provided.
-func (a *AWS) EC2s(amis []*ec2.Image) ([]*ec2.Instance, error) {
-	var err error
-	var output []*ec2.Instance
+func (a *AWS) EC2s(amis []types.Image) ([]types.Instance, error) {
+	var output []types.Instance
 
-	amiIDs := make([]*string, len(amis))
+	amiIDs := make([]string, len(amis))
 	for _, ami := range amis {
-		amiIDs = append(amiIDs, ami.ImageId)
+		amiIDs = append(amiIDs, *ami.ImageId)
 	}
 
-	ec2I := &ec2.DescribeInstancesInput{
-		Filters: []*ec2.Filter{
-			{
-				Name:   aws.String("image-id"),
-				Values: amiIDs,
+	var nextToken *string
+	for {
+		ec2I := &ec2.DescribeInstancesInput{
+			MaxResults: 1000, // nolint:gomnd
+			Filters: []types.Filter{
+				{
+					Name:   aws.String("image-id"),
+					Values: amiIDs,
+				},
 			},
-		},
-	}
+		}
+		if nextToken != nil {
+			ec2I.NextToken = nextToken
+		}
 
-	pageNum, pageMax := 0, 20
-	err = a.ec2.DescribeInstancesPages(ec2I,
-		func(page *ec2.DescribeInstancesOutput, lastPage bool) bool {
-			pageNum++
-
-			for _, res := range page.Reservations {
-				output = append(output, res.Instances...)
-			}
-
-			// Page 20 times at most
-			return !lastPage || pageNum <= pageMax
-		},
-	)
-	if err != nil {
-		return output, fmt.Errorf("%w", ErrDesribeInstances)
+		out, err := a.ec2.DescribeInstances(context.TODO(), ec2I)
+		if err != nil {
+			return output, fmt.Errorf("%w", ErrDesribeInstances)
+		}
+		for _, res := range out.Reservations {
+			output = append(output, res.Instances...)
+		}
+		if out.NextToken == nil {
+			break
+		}
+		nextToken = out.NextToken
 	}
 
 	return output, nil
 }
 
 // FilterAMIs returns back the list of AMIs with images in ec2s removed.
-func (a *AWS) FilterAMIs(amis []*ec2.Image, ec2s []*ec2.Instance) ([]*ec2.Image, error) {
+func (a *AWS) FilterAMIs(amis []types.Image, ec2s []types.Instance) ([]types.Image, error) {
 	var err error
-	var output []*ec2.Image
+	var output []types.Image
 
 	hasD := make(map[string]bool)
 	for _, ec2 := range ec2s {
@@ -136,19 +145,19 @@ func (a *AWS) FilterAMIs(amis []*ec2.Image, ec2s []*ec2.Instance) ([]*ec2.Image,
 // DeleteAMIs deregisters all AMIs in the provided list and deletes the snapshots
 // associated with the deregistered AMI. Returns a list of IDs that were successfully
 // deleted. If DryDrun == true does not actually delete.
-func (a *AWS) DeleteAMIs(amis []*ec2.Image) ([]string, error) {
+func (a *AWS) DeleteAMIs(amis []types.Image) ([]string, error) {
 	var output []string
 	eda := &ErrDeleteAMIs{}
 
 	for _, ami := range amis {
 		amiI := &ec2.DeregisterImageInput{
 			ImageId: ami.ImageId,
-			DryRun:  aws.Bool(a.cfg.DryRun),
+			DryRun:  a.cfg.DryRun,
 		}
-		_, err := a.ec2.DeregisterImage(amiI)
+		_, err := a.ec2.DeregisterImage(context.TODO(), amiI)
 		if err != nil {
-			var awsErr awserr.Error
-			if errors.As(err, &awsErr) && awsErr.Code() == "DryRunOperation" {
+			var apiErr smithy.APIError
+			if errors.As(err, &apiErr) && apiErr.ErrorCode() == "DryRunOperation" {
 				output = append(output, *ami.ImageId)
 			} else {
 				eda.Append(*ami.ImageId)
@@ -165,12 +174,12 @@ func (a *AWS) DeleteAMIs(amis []*ec2.Image) ([]string, error) {
 			snapID := bdm.Ebs.SnapshotId
 			snapI := &ec2.DeleteSnapshotInput{
 				SnapshotId: snapID,
-				DryRun:     aws.Bool(a.cfg.DryRun),
+				DryRun:     a.cfg.DryRun,
 			}
-			_, err := a.ec2.DeleteSnapshot(snapI)
+			_, err := a.ec2.DeleteSnapshot(context.TODO(), snapI)
 			if err != nil {
-				var awsErr awserr.Error
-				if errors.As(err, &awsErr) && awsErr.Code() == "DryRunOperation" {
+				var apiErr smithy.APIError
+				if errors.As(err, &apiErr) && apiErr.ErrorCode() == "DryRunOperation" {
 					output = append(output, *bdm.Ebs.SnapshotId)
 				} else {
 					eda.Append(*snapID)

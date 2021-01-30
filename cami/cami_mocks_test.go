@@ -1,19 +1,20 @@
 package cami
 
 import (
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
+	"context"
+
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/smithy-go"
 )
 
-type mockEC2 struct {
-	ec2iface.EC2API
+var _ ec2If = (*mockEC2)(nil)
 
+type mockEC2 struct {
 	RespDescImages    ec2.DescribeImagesOutput
 	RespDescImagesErr error
 
-	RespDescInstances      ec2.DescribeInstancesOutput
-	RespDescInstancesErr   error
-	RespDescInstancesPages int
+	RespDescInstances    ec2.DescribeInstancesOutput
+	RespDescInstancesErr error
 
 	RespDeregisterImage    ec2.DeregisterImageOutput
 	RespDeregisterImageErr error
@@ -22,28 +23,20 @@ type mockEC2 struct {
 	RespDeleteSnapshotErr error
 }
 
-func (m mockEC2) DescribeImages(*ec2.DescribeImagesInput) (*ec2.DescribeImagesOutput, error) {
+func (m mockEC2) DescribeImages(ctx context.Context, in *ec2.DescribeImagesInput, opts ...func(*ec2.Options)) (*ec2.DescribeImagesOutput, error) {
 	return &m.RespDescImages, m.RespDescImagesErr
 }
 
 //nolint:lll
-func (m mockEC2) DescribeInstancesPages(in *ec2.DescribeInstancesInput, fn func(*ec2.DescribeInstancesOutput, bool) bool) error {
-	for i := 1; i <= m.RespDescInstancesPages; i++ {
-		if i == m.RespDescInstancesPages {
-			fn(&m.RespDescInstances, true)
-		} else {
-			fn(&m.RespDescInstances, false)
-		}
-	}
-
-	return m.RespDescInstancesErr
+func (m mockEC2) DescribeInstances(context.Context, *ec2.DescribeInstancesInput, ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error) {
+	return &m.RespDescInstances, m.RespDescInstancesErr
 }
 
-func (m mockEC2) DeregisterImage(*ec2.DeregisterImageInput) (*ec2.DeregisterImageOutput, error) {
+func (m mockEC2) DeregisterImage(context.Context, *ec2.DeregisterImageInput, ...func(*ec2.Options)) (*ec2.DeregisterImageOutput, error) {
 	return &m.RespDeregisterImage, m.RespDeregisterImageErr
 }
 
-func (m mockEC2) DeleteSnapshot(*ec2.DeleteSnapshotInput) (*ec2.DeleteSnapshotOutput, error) {
+func (m mockEC2) DeleteSnapshot(context.Context, *ec2.DeleteSnapshotInput, ...func(*ec2.Options)) (*ec2.DeleteSnapshotOutput, error) {
 	return &m.RespDeleteSnapshot, m.RespDeleteSnapshotErr
 }
 
@@ -57,14 +50,14 @@ func (m mockErr) Error() string {
 	return "FAIL"
 }
 
-func (m mockErr) Code() string {
+func (m mockErr) ErrorCode() string {
 	return m.ErrCode
 }
 
-func (m mockErr) Message() string {
+func (m mockErr) ErrorMessage() string {
 	return "FAIL"
 }
 
-func (m mockErr) OrigErr() error {
-	return nil
+func (m mockErr) ErrorFault() smithy.ErrorFault {
+	return 0
 }
